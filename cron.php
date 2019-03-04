@@ -161,95 +161,69 @@ while (($usersThisPage = count($members)) > 0) {
 		}
 
 		/**
-		 * Modify user roles
-		 *
-		 * @todo Check if a user already has a role
+		 * Grant user roles
 		 */
 		$access = [];
-		foreach($config['groups'] as $authGroup) {
-			if(is_array($authGroup['id'])) {
+		foreach ($config['groups'] as $authGroup) {
+			if (is_array($authGroup['id'])) {
 				$id = $authGroup['id'];
 			} else {
 				$id = [];
 				$id[] = $authGroup['id'];
 			}
 
-			$role = null;
+			$groupRoleData = null;
+			foreach ($roles as $role) {
+				if ($role->name == $authGroup['role']) {
+					$groupRoleData = $role;
+					break;
+				}
+			}
+
+			if ($groupRoleData === null) {
+				// TODO: Log this
+				continue;
+			}
+
+			foreach ($discordMember->roles as $grantedRole) {
+				if ($grantedRole->name == $groupRoleData->name) {
+					// User has already been granted this role.
+					continue;
+				}
+			}
+
+			$roleGranted = false;
 
 			// General "Authenticated" Role
-			if(in_array('1234', $id)) {
-				foreach($roles as $role) {
-					if($role->name == $authGroup['role']) {
-						break;
-					}
-				}
-
-				$restcord->guild->addGuildMemberRole([
-					'guild.id' => (int) $config['discord']['guildId'],
-					'user.id' => (int) $discordID,
-					'role.id' => (int) $role->id
-				]);
-
+			if (!$roleGranted && in_array('1234', $id)) {
 				$access[] = 'character';
-
-				continue;
+				$roleGranted = true;
 			}
 
 			// Authentication by characterID
-			if(in_array($characterID, $id)) {
-				foreach($roles as $role) {
-					if($role->name == $authGroup['role']) {
-						break;
-					}
-				}
-
-				$restcord->guild->addGuildMemberRole([
-					'guild.id' => (int) $config['discord']['guildId'],
-					'user.id' => (int) $discordID,
-					'role.id' => (int) $role->id
-				]);
-
+			if (!$roleGranted && in_array($characterID, $id)) {
 				$access[] = 'character';
-
-				continue;
+				$roleGranted = true;
 			}
 
 			// Autnetification by allianceID
-			if(in_array($allianceID, $id)) {
-				foreach($roles as $role) {
-					if($role->name == $authGroup['role']) {
-						break;
-					}
-				}
-
-				$restcord->guild->addGuildMemberRole([
-					'guild.id' => (int) $config['discord']['guildId'],
-					'user.id' => (int) $discordID,
-					'role.id' => (int) $role->id
-				]);
-
+			if (!$roleGranted && in_array($allianceID, $id)) {
 				$access[] = 'alliance';
-
-				continue;
+				$roleGranted = true;
 			}
 
 			// Authentification by corporationID
-			if(in_array($corporationID, $id)) {
-				foreach($roles as $role) {
-					if($role->name == $authGroup['role']) {
-						break;
-					}
-				}
-
-				$restcord->guild->addGuildMemberRole([
-					'guild.id' => (int) $config['discord']['guildId'],
-					'user.id' => (int) $discordID,
-					'role.id' => (int) $role->id
-				]);
-
+			if (!$roleGranted && in_array($corporationID, $id)) {
 				$access[] = 'corp';
+				$roleGranted = true;
+			}
 
-				continue;
+			if ($roleGranted) {
+				$restcord->guild->addGuildMemberRole([
+					'guild.id' => (int)$config['discord']['guildId'],
+					'user.id'  => (int)$discordID,
+					'role.id'  => (int)$groupRoleData->id
+				]);
 			}
 		}
 
