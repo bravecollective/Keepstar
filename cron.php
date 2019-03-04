@@ -37,7 +37,7 @@ if(isset($config['discord']['botNick'])) {
 			'guild.id' => (int) $config['discord']['guildId'],
 			'nick' => $config['discord']['botNick']
 		]);
-	} catch(Exception $e) {
+	} catch (Exception $e) {
 		$restcord->guild->modifyCurrentUsersNick([
 			'guild.id' => (int) $config['discord']['guildId'],
 			'nick' => $config['discord']['botNick']
@@ -77,14 +77,14 @@ $currentGuild = $restcord->guild->getGuild([
 	'guild.id' => (int) $config['discord']['guildId']
 ]);
 
-while (($usersThisPage = count($members)) > 0) {
+while (($usersThisPage   = count($members)) > 0) {
 	foreach($users as $user) {
-		$characterID = $user['characterID'];
-		$characterData = characterDetails($characterID);
-		$discordID = (int) $user['discordID']; // this has to be casted to int
-		$type = json_decode($user['groups'], true);
-		$id = $user['id'];
-		$corporationID = $characterData['corporation_id'];
+		$characterID     = $user['characterID'];
+		$characterData   = characterDetails($characterID);
+		$discordID       = (int) $user['discordID']; // this has to be casted to int
+		$type            = json_decode($user['groups'], true);
+		$id              = $user['id'];
+		$corporationID   = $characterData['corporation_id'];
 		$corporationData = corporationDetails($corporationID);
 
 		if(!isset($characterData['alliance_id'])) {
@@ -161,9 +161,17 @@ while (($usersThisPage = count($members)) > 0) {
 		}
 
 		/**
-		 * Grant user roles
+		 * Modify user roles
 		 */
-		$access = [];
+		$access = array(
+			'catchall'  => array(),
+			'alliance'  => array(),
+			'corp'      => array(),
+			'character' => array()
+		);
+		$calculatedRoleNames = array();
+
+		// Get intended roles
 		foreach ($config['groups'] as $authGroup) {
 			if (is_array($authGroup['id'])) {
 				$id = $authGroup['id'];
@@ -172,6 +180,7 @@ while (($usersThisPage = count($members)) > 0) {
 				$id[] = $authGroup['id'];
 			}
 
+			// check that the authGroup role is valid
 			$groupRoleData = null;
 			foreach ($roles as $role) {
 				if ($role->name == $authGroup['role']) {
@@ -181,49 +190,39 @@ while (($usersThisPage = count($members)) > 0) {
 			}
 
 			if ($groupRoleData === null) {
-				// TODO: Log this
+				$log->notice('Invalid authgroup role: ' . $authGroup['role'] . ' please update your config');
 				continue;
 			}
 
-			foreach ($discordMember->roles as $grantedRole) {
-				if ($grantedRole->name == $groupRoleData->name) {
-					// User has already been granted this role.
-					continue;
-				}
-			}
-
+			// Determine if the user should have this role
 			$roleGranted = false;
 
 			// General "Authenticated" Role
 			if (!$roleGranted && in_array('1234', $id)) {
-				$access[] = 'character';
+				$access['catchall'][] = $groupRoleData->name;
+				$roleGranted = true;
+			}
+
+			// Authentication by allianceID
+			if (!$roleGranted && in_array($allianceID, $id)) {
+				$access['alliance'][] = $groupRoleData->name;
+				$roleGranted = true;
+			}
+
+			// Authentication by corporationID
+			if (!$roleGranted && in_array($corporationID, $id)) {
+				$access['corp'][] = $authGroup['role'];
 				$roleGranted = true;
 			}
 
 			// Authentication by characterID
 			if (!$roleGranted && in_array($characterID, $id)) {
-				$access[] = 'character';
-				$roleGranted = true;
-			}
-
-			// Autnetification by allianceID
-			if (!$roleGranted && in_array($allianceID, $id)) {
-				$access[] = 'alliance';
-				$roleGranted = true;
-			}
-
-			// Authentification by corporationID
-			if (!$roleGranted && in_array($corporationID, $id)) {
-				$access[] = 'corp';
+				$access['character'][] = $groupRoleData->name;
 				$roleGranted = true;
 			}
 
 			if ($roleGranted) {
-				$restcord->guild->addGuildMemberRole([
-					'guild.id' => (int)$config['discord']['guildId'],
-					'user.id'  => (int)$discordID,
-					'role.id'  => (int)$groupRoleData->id
-				]);
+				$calculatedRoleNames[] = $groupRoleData->name;
 			}
 		}
 
@@ -231,94 +230,112 @@ while (($usersThisPage = count($members)) > 0) {
 		$accessList = json_encode($access);
 
 		// Insert it all into the db
-		insertUser($characterID, (int) $discordID, $accessList);
+		insertUser($characterID, $discordID, $accessList);
 
-		/**
-		 * Removing roles in case
-		 */
-		$removeTheseRoles = [];
-		$removeTheseRolesName = [];
+		$grantedRoles = array();
+		foreach ($discordMember->roles as $serverRole) {
+			$grantedRoles[] = $serverRole->name;
+		}
 
-		foreach($config['groups'] as $authGroup) {
-			if(is_array($authGroup['id'])) {
-				$id = $authGroup['id'];
-			} else {
-				$id = [];
-				$id[] = $authGroup['id'];
+		// Remove extra roles
+		$extraRoles = array_diff($grantedRoles, $calculatedRoleNames);
+		foreach ($extraRoles as $roleName) {
+			$removeRole = null;
+			foreach ($roles as $role) {
+				if ($role->name === $roleName) {
+					$removeRole = $role->id;
+					break;
+				}
 			}
 
-			foreach($roles as $role) {
-				if($role->name === $authGroup['role']) {
-					if(((isset($characterData['corporation_id']) && !in_array($characterData['corporation_id'], $id)) && ((isset($characterData['alliance_id']) && !in_array($characterData['alliance_id'], $id)) || !isset($characterData['alliance_id'])) && !in_array($characterID, $id) && !in_array('1234', $id)) && in_array($role->id, $member->roles)) {
-						$removeTheseRoles[] = (int) $role->id;
+			if ($removeRole === null) {
+				continue;
+			}
 
-						$removeTheseRolesName[] = $role->name;
+			try {
+				$restcord->guild->removeGuildMemberRole([
+					'guild.id' => (int)$config['discord']['guildId'],
+					'user.id'  => (int)$discordID,
+					'role.id'  => (int)$removeRole
+				]);
+				$log->notice($eveName  . ' has been removed from the role ' . $role->name);
+			} catch (Exception $e) {
+				$error = $e->getMessage();
 
-						$log->notice($eveName  . ' has been removed from the role ' . $role->name);
-
-						continue;
-					}
-
-					if(in_array($role->id, $removeTheseRoles, true)) {
-						unset($removeTheseRoles[array_search($role->id, $removeTheseRoles, true)]);
-					}
+				// Check if error is user left server and if so remove them
+				if(strpos($error, '10007') !== false) {
+					deleteUser($id);
+					continue 2;
 				}
+
+				$log->error('ERROR: ' . $error);
 			}
 		}
 		logChannel($eveName . ' has been removed from the following roles: ' . implode(', ', $extraRoles));
 
-		if(count($removeTheseRoles) > 0) {
-			foreach($removeTheseRoles as $removeRole) {
-				try {
-					$restcord->guild->removeGuildMemberRole([
-						'guild.id' => (int) $config['discord']['guildId'],
-						'user.id' => (int) $discordID,
-						'role.id' => (int) $removeRole
-					]);
-				} catch(Exception $e) {
-					$error = $e->getMessage();
-
-					// Check if error is user left server and if so remove them
-					if(strpos($error, '10007') !== false) {
-						deleteUser($id);
-						continue 2;
-					}
-
-					$log->error('ERROR: ' . $error);
+		// Add missing roles
+		$missingRoles = array_diff($calculatedRoleNames, $grantedRoles);
+		foreach ($missingRoles as $role) {
+			$addRole = null;
+			foreach ($roles as $role) {
+				if ($role->name === $roleName) {
+					$addRole = $role->id;
+					break;
 				}
 			}
 
-			logChannel($eveName . ' has been removed from the following roles: ' . $removedRoles);
+			if ($addRole === null) {
+				continue;
+			}
 
-			if(!isset($config['discord']['removeUser'])) {
+			$restcord->guild->addGuildMemberRole([
+				'guild.id' => (int)$config['discord']['guildId'],
+				'user.id'  => (int)$discordID,
+				'role.id'  => (int)$addRole
+			]);
+		}
+		logChannel($eveName . ' has been added to the following roles: ' . implode(', ', $missingRoles));
+
+
+		/**
+		 * Cleanup any users who don't have any roles
+		 */
+		if (count($calculatedRollNames) === 0) {
+			if (!isset($config['discord']['removeUser'])) {
 				$config['discord']['removeUser'] = false;
 			}
 
-			if($config['discord']['removeUser'] === true) {
+			if ($config['discord']['removeUser'] === true) {
 				$restcord->guild->removeGuildMember([
-					'guild.id' => (int) $config['discord']['guildId'],
-					'user.id' => (int) $discordID
+					'guild.id' => (int)$config['discord']['guildId'],
+					'user.id'  => (int)$discordID
 				]);
+
+				deleteUser($id);
+				$log->notice('Deleting ' . $eveName . ' from the db as they have no roles');
+				continue;
 			}
 
-			if(isset($config['discord']['removedRole']) && $config['discord']['removedRole'] !== false) {
+			if ($config['discord']['removedRole'] !== false) {
+				$removedRole = null;
 				foreach ($roles as $role) {
 					if ($role->name == $config['discord']['removedRole']) {
+						$removedRole = $role->id;
 						break;
 					}
 				}
-				$restcord->guild->addGuildMemberRole([
-					'guild.id' => (int)$config['discord']['guildId'],
-					'user.id' => (int)$_SESSION['user_id'],
-					'role.id' => (int)$role->id
-				]);
+
+				if ($removedRole === null) {
+					$log->notice('config->discord->removedRole has an invalid value: ' .
+					             $config['discord']['removedRole'] . ' please update your config.');
+				} else {
+					$restcord->guild->addGuildMemberRole([
+						'guild.id' => (int)$config['discord']['guildId'],
+						'user.id'  => (int)$discordID,
+						'role.id'  => (int)$removedRole
+					]);
+				}
 			}
-		}
-
-		if(count($type) === 0) {
-			$log->notice("2 $type");
-
-			deleteUser($id);
 		}
 	} // END DB User Check
 
@@ -331,8 +348,6 @@ while (($usersThisPage = count($members)) > 0) {
 } // END paginated discord user list
 
 /**
- * @todo Check for users on the server that are NOT ni the auth DB
- * and remove all roles they might have. Just to be absolutely sure.
  * Don't touch the bot here!
  */
 logChannel('Finished cron job');
