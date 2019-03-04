@@ -97,12 +97,11 @@ while (($usersThisPage = count($members)) > 0) {
 		}
 
 		$eveName = $characterData['name'];
-		$exists = false;
+		$discordMember = null;
 
 		foreach($members as $member) {
 			if($member->user->id === $discordID) {
-				$exists = true;
-
+				$discordMember = $member;
 				break;
 			}
 		}
@@ -112,7 +111,7 @@ while (($usersThisPage = count($members)) > 0) {
 			continue;
 		}
 
-		if($exists === false) {
+		if ($discordMember === null) {
 			$log->notice("$eveName has been removed from the database as they are no longer a member of the server.");
 
 			deleteUser($id);
@@ -125,68 +124,40 @@ while (($usersThisPage = count($members)) > 0) {
 		 * Server owner will not be touched
 		 */
 		// To keep compatible with older config files
-		if(!isset($config['discord']['addCorpTicker'])) {
+		if (!isset($config['discord']['addCorpTicker'])) {
 			$config['discord']['addCorpTicker'] = $config['discord']['addTicker'];
 		}
 
-		if(($config['discord']['enforceInGameName'] || $config['discord']['addCorpTicker']) && (int) $currentGuild->owner_id !== (int) $discordID) {
-			if($config['discord']['enforceInGameName'] && $config['discord']['addCorpTicker']) {
-				if(!empty($corporationData['ticker'])) {
-					$newNick = '[' . $corporationData['ticker'] . '] ' . $eveName;
+		$oldNick = $discordMember->nick;
+		if (!isset($oldNick)) {
+			$oldNick = $discordMember->user->username;
+		}
 
-					if(isset($config['discord']['addAllianceTicker']) && $config['discord']['addAllianceTicker'] === true && !is_null($allianceTicker)) {
-						$newNick = $allianceTicker . ' [' . $corporationData['ticker'] . '] ' . $eveName;
-					}
+		$newNick = trim(preg_replace('/^.{0,5}\s?\[.{1,5}\]\s+/', '', $oldNick)); // strip corp and alliance tickers from user's existing nick
+		if ($config['discord']['enforceInGameName'] && (int)$currentGuild->owner_id !== $discordID) {
+			$newNick = $eveName;
+		}
 
-					if (strlen($newNick) >= 32) {
-						$newNick = mb_strimwidth($newNick, 0, 32);
-					}
-
-					$restcord->guild->modifyGuildMember([
-						'guild.id' => (int) $config['discord']['guildId'],
-						'user.id' => (int) $discordID,
-						'nick' => $newNick
-					]);
-				}
-			} else if(!$config['discord']['enforceInGameName'] && $config['discord']['addCorpTicker']) {
-				$memberDetails = $restcord->guild->getGuildMember([
-					'guild.id' => (int) $config['discord']['guildId'],
-					'user.id' => (int) $discordId
-				]);
-
-				if($memberDetails->nick) {
-					$searchstring = '[' . $corporationData['ticker'] . ']';
-
-					if(isset($config['discord']['addAllianceTicker']) && $config['discord']['addAllianceTicker'] === true && !is_null($allianceTicker)) {
-						$searchstring = $allianceTicker . ' [' . $corporationData['ticker'] . ']';
-					}
-
-					$discordNick = str_replace($searchstring, '', $memberDetails->nick);
-					$cleanNick = trim($discordNick);
-					$newNick = '[' . $corporationData['ticker'] . '] ' . $cleanNick;
-				} else {
-					$newNick = '[' . $corporationData['ticker'] . '] ' . trim($memberDetails->user->username);
-				}
-
-				if (strlen($newNick) >= 32) {
-					$newNick = mb_strimwidth($newNick, 0, 32);
-				}
-
-				$restcord->guild->modifyGuildMember([
-					'guild.id' => (int) $config['discord']['guildId'],
-					'user.id' => (int) $discordId,
-					'nick' => $newNick
-				]);
-			} else {
-				if (strlen($eveName) >= 32) {
-					$eveName = mb_strimwidth($eveName, 0, 32);
-				}
-				$restcord->guild->modifyGuildMember([
-					'guild.id' => (int) $config['discord']['guildId'],
-					'user.id' => (int) $discordID,
-					'nick' => $eveName
-				]);
+		if ($config['discord']['addCorpTicker'] && !empty($corporationData['ticker'])) {
+			$tickers = array();
+			if ($config['discord']['addAllianceTicker'] && !is_null($allianceTicker)) {
+				$tickers[] = $allianceTicker;
 			}
+			$tickers[] = '[' . $corporationData['ticker'] . ']';
+			$tickers[] = $newNick;
+			$newNick = implode(' ', $tickers);
+		}
+
+		if ($newNick !== $oldNick) {
+			if (strlen($newNick) >= 32) {
+				$newNick = mb_strimwidth($newNick, 0, 32);
+			}
+
+			$restcord->guild->modifyGuildMember([
+				'guild.id' => (int)$config['discord']['guildId'],
+				'user.id'  => $discordID,
+				'nick'     => $newName
+			]);
 		}
 
 		/**
