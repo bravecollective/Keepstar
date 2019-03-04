@@ -59,12 +59,7 @@ if(!$status || $status['players'] === null || (int) $status['players'] < 100) {
 	die();
 }
 
-if((int) $config['discord']['logChannel'] !== 0) {
-	$restcord->channel->createMessage([
-		'channel.id' => (int) $config['discord']['logChannel'],
-		'content' => 'Starting cron job to check member access and roles ...'
-	]);
-}
+logChannel('Starting cron job to check member access and roles ...');
 
 // get discord members
 $members = $restcord->guild->listGuildMembers([
@@ -312,9 +307,7 @@ while (($usersThisPage = count($members)) > 0) {
 					if(((isset($characterData['corporation_id']) && !in_array($characterData['corporation_id'], $id)) && ((isset($characterData['alliance_id']) && !in_array($characterData['alliance_id'], $id)) || !isset($characterData['alliance_id'])) && !in_array($characterID, $id) && !in_array('1234', $id)) && in_array($role->id, $member->roles)) {
 						$removeTheseRoles[] = (int) $role->id;
 
-						if((int) $config['discord']['logChannel'] !== 0) {
-							$removeTheseRolesName[] = $role->name;
-						}
+						$removeTheseRolesName[] = $role->name;
 
 						$log->notice($eveName  . ' has been removed from the role ' . $role->name);
 
@@ -327,6 +320,7 @@ while (($usersThisPage = count($members)) > 0) {
 				}
 			}
 		}
+		logChannel($eveName . ' has been removed from the following roles: ' . implode(', ', $extraRoles));
 
 		if(count($removeTheseRoles) > 0) {
 			foreach($removeTheseRoles as $removeRole) {
@@ -349,14 +343,7 @@ while (($usersThisPage = count($members)) > 0) {
 				}
 			}
 
-			if((int) $config['discord']['logChannel'] !== 0) {
-				$removedRoles = implode(', ', $removeTheseRolesName);
-
-				$restcord->channel->createMessage([
-					'channel.id' => (int) $config['discord']['logChannel'],
-					'content' => $eveName . ' has been removed from the following roles: ' . $removedRoles
-				]);
-			}
+			logChannel($eveName . ' has been removed from the following roles: ' . $removedRoles);
 
 			if(!isset($config['discord']['removeUser'])) {
 				$config['discord']['removeUser'] = false;
@@ -403,11 +390,17 @@ while (($usersThisPage = count($members)) > 0) {
  * and remove all roles they might have. Just to be absolutely sure.
  * Don't touch the bot here!
  */
-if((int) $config['discord']['logChannel'] !== 0) {
-	$restcord->channel->createMessage([
-		'channel.id' => (int) $config['discord']['logChannel'],
-		'content' => 'Finished cron job'
-	]);
-}
+logChannel('Finished cron job');
 
 $log->notice('AUTHCHECK FINISHED');
+
+function logChannel($message)
+{
+	global $config, $restcord;
+	if ((int)$config['discord']['logChannel'] !== 0) {
+		$restcord->channel->createMessage([
+			'channel.id' => (int) $config['discord']['logChannel'],
+			'content' => $message
+		]);
+	}
+}
