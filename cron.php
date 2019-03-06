@@ -156,7 +156,7 @@ while (($usersThisPage   = count($members)) > 0) {
 			$restcord->guild->modifyGuildMember([
 				'guild.id' => (int)$config['discord']['guildId'],
 				'user.id'  => $discordID,
-				'nick'     => $newName
+				'nick'     => $newNick
 			]);
 		}
 
@@ -275,7 +275,7 @@ while (($usersThisPage   = count($members)) > 0) {
 
 		// Add missing roles
 		$missingRoles = array_diff($calculatedRoleNames, $grantedRoles);
-		foreach ($missingRoles as $role) {
+		foreach ($missingRoles as $roleName) {
 			$addRole = null;
 			foreach ($roles as $role) {
 				if ($role->name === $roleName) {
@@ -300,7 +300,7 @@ while (($usersThisPage   = count($members)) > 0) {
 		/**
 		 * Cleanup any users who don't have any roles
 		 */
-		if (count($calculatedRollNames) === 0) {
+		if (count($calculatedRoleNames) === 0) {
 			if (!isset($config['discord']['removeUser'])) {
 				$config['discord']['removeUser'] = false;
 			}
