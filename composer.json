@@ -20,6 +20,11 @@
   ],
   "require": {
     "php": ">=5.5.0",
+    "ext-curl": "*",
+    "ext-json": "*",
+    "ext-mbstring": "*",
+    "ext-mysqli": "*",
+    "ext-pdo": "*",
     "slim/slim": "~2.6.2",
     "slim/views": "~0.1.3",
     "zeuxisoo/slim-whoops": "~0.3.0",

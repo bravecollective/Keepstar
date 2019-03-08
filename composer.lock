@@ -1,10 +1,10 @@
 {
     "_readme": [
         "This file locks the dependencies of your project to a known state",
-        "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
+        "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#composer-lock-the-lock-file",
         "This file is @generated automatically"
     ],
-    "content-hash": "fedca0506775d66bf5ea994e88b0103d",
+    "content-hash": "fc9b3b3c0beb51c8074c0cc12a64810a",
     "packages": [
         {
             "name": "filp/whoops",
@@ -619,16 +619,16 @@
         },
         {
             "name": "restcord/restcord",
-            "version": "dev-master",
+            "version": "0.3.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/restcord/restcord.git",
-                "reference": "a760285523cb64aaaea02a4656f149854dc346d9"
+                "reference": "c1d8c8cf5423a502e6c485269bc1db5db4116d6e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/restcord/restcord/zipball/a760285523cb64aaaea02a4656f149854dc346d9",
-                "reference": "a760285523cb64aaaea02a4656f149854dc346d9",
+                "url": "https://api.github.com/repos/restcord/restcord/zipball/c1d8c8cf5423a502e6c485269bc1db5db4116d6e",
+                "reference": "c1d8c8cf5423a502e6c485269bc1db5db4116d6e",
                 "shasum": ""
             },
             "require": {
@@ -665,7 +665,7 @@
                 }
             ],
             "description": "REST Library for the Discord API",
-            "time": "2019-01-27T18:32:55+00:00"
+            "time": "2018-12-27T19:50:58+00:00"
         },
         {
             "name": "slim/slim",
@@ -990,13 +990,17 @@
     "aliases": [],
     "minimum-stability": "stable",
     "stability-flags": {
-        "restcord/restcord": 20,
         "monolog/monolog": 20
     },
     "prefer-stable": false,
     "prefer-lowest": false,
     "platform": {
-        "php": ">=5.5.0"
+        "php": ">=5.5.0",
+        "ext-curl": "*",
+        "ext-json": "*",
+        "ext-mbstring": "*",
+        "ext-mysqli": "*",
+        "ext-pdo": "*"
     },
     "platform-dev": []
 }
