@@ -77,7 +77,7 @@ $currentGuild = $restcord->guild->getGuild([
 	'guild.id' => (int) $config['discord']['guildId']
 ]);
 
-while (($usersThisPage   = count($members)) > 0) {
+while (($usersThisPage = count($members)) > 0) {
 	foreach($users as $user) {
 		$characterID     = $user['characterID'];
 		$characterData   = characterDetails($characterID);
@@ -343,7 +343,7 @@ while (($usersThisPage   = count($members)) > 0) {
 	$members = $restcord->guild->listGuildMembers([
 		'guild.id' => $config['discord']['guildId'],
 		'limit' => 1000,
-		'after' => $members[$usersThisPage - 1]['user']['id']
+		'after' => $members[$usersThisPage - 1]->user->id
 	]);
 } // END paginated discord user list
 
