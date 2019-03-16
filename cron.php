@@ -233,8 +233,13 @@ while (($usersThisPage = count($members)) > 0) {
 		insertUser($characterID, $discordID, $accessList);
 
 		$grantedRoles = array();
-		foreach ($discordMember->roles as $serverRole) {
-			$grantedRoles[] = $serverRole->name;
+		foreach ($discordMember->roles as $serverRoleId) {
+			foreach ($roles as $role) {
+				if ($role->id === $serverRoleId) {
+					$grantedRoles[] = role->name;
+					break;
+				}
+			}
 		}
 
 		// Remove extra roles
