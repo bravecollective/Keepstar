@@ -236,7 +236,7 @@ while (($usersThisPage = count($members)) > 0) {
 		foreach ($discordMember->roles as $serverRoleId) {
 			foreach ($roles as $role) {
 				if ($role->id === $serverRoleId) {
-					$grantedRoles[] = role->name;
+					$grantedRoles[] = $role->name;
 					break;
 				}
 			}
